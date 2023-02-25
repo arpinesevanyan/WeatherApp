@@ -70,4 +70,10 @@ dependencies {
     //Accompanist
     api googleDependecies.values()
 
+    //Network
+    api networkingDependencies.values()
+
+    implementation 'com.squareup.picasso:picasso:2.71828'
+    implementation 'com.google.android.gms:play-services-location:21.0.1'
+
 }
