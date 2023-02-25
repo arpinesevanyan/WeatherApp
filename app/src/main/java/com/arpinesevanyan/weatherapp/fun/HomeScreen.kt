@@ -1,8 +1,6 @@
 package com.arpinesevanyan.weatherapp.`fun`
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.runtime.Composable
@@ -25,12 +23,17 @@ import com.google.accompanist.pager.HorizontalPager
 import com.google.accompanist.pager.pagerTabIndicatorOffset
 import com.google.accompanist.pager.rememberPagerState
 import kotlinx.coroutines.launch
+import org.json.JSONArray
+import org.json.JSONObject
 
 @Composable
-fun HomeScreen(currentDay: MutableState<WeatherModel>) {
+fun HomeScreen(
+    currentDay: MutableState<WeatherModel>,
+    onClickSync: () -> Unit,
+    onClickSearch: () -> Unit
+) {
     Column(
-        modifier = Modifier
-            .padding(5.dp)
+        modifier = Modifier.padding(5.dp)
     ) {
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -66,7 +69,10 @@ fun HomeScreen(currentDay: MutableState<WeatherModel>) {
                     color = Color.White
                 )
                 Text(
-                    text = currentDay.value.currentTemp.toFloat().toInt().toString() + "ºC",
+                    text = if (currentDay.value.currentTemp.isNotEmpty())
+                        currentDay.value.currentTemp.toFloat().toInt().toString() + "ºC"
+                    else currentDay.value.maxTemp.toFloat().toInt().toString() +
+                            "ºC/${currentDay.value.minTemp.toFloat().toInt()}ºC",
                     style = TextStyle(fontSize = 65.sp),
                     color = Color.White
                 )
@@ -80,9 +86,9 @@ fun HomeScreen(currentDay: MutableState<WeatherModel>) {
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     IconButton(onClick = {
+                        onClickSearch.invoke()
 
-                    }
-                    ) {
+                    }) {
                         Icon(
                             painter = painterResource(id = R.drawable.ic_search),
                             contentDescription = "im3",
@@ -97,9 +103,8 @@ fun HomeScreen(currentDay: MutableState<WeatherModel>) {
                         color = Color.White
                     )
                     IconButton(onClick = {
-
-                    }
-                    ) {
+                        onClickSync.invoke()
+                    }) {
                         Icon(
                             painter = painterResource(id = R.drawable.ic_sync),
                             contentDescription = "im3",
@@ -115,7 +120,7 @@ fun HomeScreen(currentDay: MutableState<WeatherModel>) {
 
 @OptIn(ExperimentalPagerApi::class)
 @Composable
-fun TabLayout(daysList: MutableState<List<WeatherModel>>) {
+fun TabLayout(daysList: MutableState<List<WeatherModel>>, currentDay: MutableState<WeatherModel>) {
     val tabList = listOf("HOURS", "DAYS")
     val pagerState = rememberPagerState()
     val tabIndex = pagerState.currentPage
@@ -124,50 +129,58 @@ fun TabLayout(daysList: MutableState<List<WeatherModel>>) {
     Column(
         modifier = Modifier
             .padding(
-                start = 5.dp,
-                end = 5.dp
+                start = 5.dp, end = 5.dp
             )
             .clip(RoundedCornerShape(5.dp))
     ) {
         TabRow(
-            selectedTabIndex = tabIndex,
-            indicator = { pos ->
+            selectedTabIndex = tabIndex, indicator = { pos ->
                 TabRowDefaults.Indicator(
                     Modifier.pagerTabIndicatorOffset(pagerState, pos)
                 )
-            },
-            backgroundColor = BlueLight,
-            contentColor = Color.White
+            }, backgroundColor = BlueLight, contentColor = Color.White
         ) {
             tabList.forEachIndexed { index, text ->
-                Tab(
-                    selected = false,
-                    onClick = {
-                        coroutineScope.launch {
-                            pagerState.animateScrollToPage(index)
-                        }
-                    },
-                    text = {
-                        Text(text = text)
+                Tab(selected = false, onClick = {
+                    coroutineScope.launch {
+                        pagerState.animateScrollToPage(index)
                     }
-                )
+                }, text = {
+                    Text(text = text)
+                })
             }
         }
         HorizontalPager(
-            count = tabList.size,
-            state = pagerState,
-            modifier = Modifier.weight(1.0f)
+            count = tabList.size, state = pagerState, modifier = Modifier.weight(1.0f)
         ) { index ->
-            LazyColumn(
-                modifier = Modifier.fillMaxSize()
-            ) {
-                itemsIndexed(
-                    daysList.value
-                )
-                { _, item ->
-                    ListItem(item)
-                }
+            val list = when (index) {
+                0 -> getWeatherByHours(currentDay.value.hours)
+                1 -> daysList.value
+                else -> daysList.value
             }
+            HomeList(list, currentDay)
         }
     }
+}
+
+private fun getWeatherByHours(hours: String): List<WeatherModel> {
+    if (hours.isEmpty()) return listOf()
+    val hoursArray = JSONArray(hours)
+    val list = ArrayList<WeatherModel>()
+    for (i in 0 until hoursArray.length()) {
+        val item = hoursArray[i] as JSONObject
+        list.add(
+            WeatherModel(
+                "",
+                item.getString("time"),
+                item.getString("temp_c").toFloat().toInt().toString() + "ºC",
+                item.getJSONObject("condition").getString("text"),
+                item.getJSONObject("condition").getString("icon"),
+                "",
+                "",
+                ""
+            )
+        )
+    }
+    return list
 }
